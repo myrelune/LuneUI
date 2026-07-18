@@ -3375,7 +3375,10 @@ function Library:CreateWindow(config)
 
     function Win:SelectTab(tabObj)
         for _, t in pairs(Win.Tabs) do
-            t.Button.BackgroundTransparency = 1
+            -- Add a check to ensure t.Button exists
+            if t.Button then
+                t.Button.BackgroundTransparency = 1
+            end
             if t.Label then
                 t.Label.TextColor3 = Library.Theme.TextDark
             end
@@ -3384,13 +3387,17 @@ function Library:CreateWindow(config)
                 t.Icon.ImageColor3 = Library.Theme.TextDark
             end
         end
-
-        tabObj.Button.BackgroundTransparency = 0.8
-        tabObj.Button.BackgroundColor3 = Library.Theme.Accent
+    
+        -- Add a check to ensure tabObj.Button exists
+        if tabObj.Button then
+            tabObj.Button.BackgroundTransparency = 0.8
+            tabObj.Button.BackgroundColor3 = Library.Theme.Accent
+        end
+        
         if tabObj.Label then
             tabObj.Label.TextColor3 = Library.Theme.Text
         end
-
+    
         tabObj.Page.Visible = true
         if tabObj.Icon then
             tabObj.Icon.ImageColor3 = Library.Theme.Accent
