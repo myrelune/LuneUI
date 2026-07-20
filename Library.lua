@@ -1551,6 +1551,13 @@ function Library.AttachComponents(obj, container)
             Input.Text = Library.Flags[config.Flag]
         end
 
+        if config.Callback then
+            config.Callback(Input.Text)
+        end
+        if config.Flag then
+            Library.Flags[config.Flag] = Input.Text
+        end
+
         local inputObj = {
             Frame = Frame,
             Name = config.Name or "Input",
