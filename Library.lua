@@ -1733,13 +1733,26 @@ function Library.AttachComponents(obj, container)
         if type(config) == "string" then
             config = {Name = config, Min = min, Max = max, Default = default, Callback = callback}
         end
+    
         local slider = {Name = config.Name, Flag = config.Flag, Callback = config.Callback}
+    
         local min, max = config.Min or 0, config.Max or 100
+        local increment = config.Increment or 1
         local value = config.Default or min
         local dragging = false
-
+    
+        local function SnapValue(val)
+            return math.clamp(
+                math.floor((val - min) / increment + 0.5) * increment + min,
+                min,
+                max
+            )
+        end
+    
+        value = SnapValue(value)
+    
         local Frame, Stroke = CreateContainer(50, config.Tooltip, config.ContextMenu)
-
+    
         local Label = Instance.new("TextLabel")
         Label.Parent = Frame
         Label.Text = config.Name
@@ -1751,7 +1764,7 @@ function Library.AttachComponents(obj, container)
         Label.TextSize = 14
         Label.TextXAlignment = Enum.TextXAlignment.Left
         Library:RegisterTheme(Label, "TextColor3", "Text")
-
+    
         local ValueLabel = Instance.new("TextLabel")
         ValueLabel.Parent = Frame
         ValueLabel.Text = tostring(value)
@@ -1763,28 +1776,30 @@ function Library.AttachComponents(obj, container)
         ValueLabel.TextSize = 13
         ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
         Library:RegisterTheme(ValueLabel, "TextColor3", "TextDark")
-
+    
         local SliderBg = Instance.new("Frame")
         SliderBg.Parent = Frame
         SliderBg.Size = UDim2.new(1, -24, 0, 8)
         SliderBg.Position = UDim2.new(0, 12, 0, 32)
         SliderBg.BackgroundColor3 = Library.Theme.ToggleBg
+    
         local SCorner = Instance.new("UICorner")
         SCorner.CornerRadius = UDim.new(1, 0)
         SCorner.Parent = SliderBg
-
+    
         local Fill = Instance.new("Frame")
         Fill.Parent = SliderBg
         Fill.Size = UDim2.new((value - min) / (max - min), 0, 1, 0)
         Fill.BackgroundColor3 = Library.Theme.Accent
+    
         local FCorner = Instance.new("UICorner")
         FCorner.CornerRadius = UDim.new(1, 0)
         FCorner.Parent = Fill
+    
         Library:RegisterTheme(Fill, "BackgroundColor3", "Accent")
-
-        Library:RegisterTheme(Fill, "BackgroundColor3", "Accent")
-
+    
         local lastClick = 0
+    
         local function CheckDoubleClick()
             if tick() - lastClick < 0.4 then
                 local Box = Instance.new("TextBox")
@@ -1792,44 +1807,51 @@ function Library.AttachComponents(obj, container)
                 Box.Size = UDim2.new(0, 50, 0, 20)
                 Box.Position = UDim2.new(1, -60, 0, 8)
                 Box.BackgroundTransparency = 1
-                Box.BackgroundColor3 = Library.Theme.Main
                 Box.TextColor3 = Library.Theme.Text
                 Box.Font = Enum.Font.Gotham
                 Box.TextSize = 14
                 Box.TextXAlignment = Enum.TextXAlignment.Right
                 Box.Text = tostring(value)
-                Box.ClipsDescendants = true
-
+    
                 ValueLabel.Visible = false
                 Box:CaptureFocus()
-
-                Box.FocusLost:Connect(
-                    function()
-                        local num = tonumber(Box.Text)
-                        if num then
-                            value = math.clamp(num, min, max)
-                            local percent = (value - min) / (max - min)
-                            Tween(Fill, {0.1}, {Size = UDim2.new(percent, 0, 1, 0)})
-                            ValueLabel.Text = tostring(value)
-                            if config.Callback then
-                                config.Callback(value)
-                            end
-                            if config.Flag then
-                                Library.Flags[config.Flag] = value
-                            end
+    
+                Box.FocusLost:Connect(function()
+                    local num = tonumber(Box.Text)
+    
+                    if num then
+                        value = SnapValue(num)
+    
+                        local percent = (value - min) / (max - min)
+    
+                        Tween(Fill, {0.1}, {
+                            Size = UDim2.new(percent, 0, 1, 0)
+                        })
+    
+                        ValueLabel.Text = tostring(value)
+    
+                        if config.Callback then
+                            config.Callback(value)
                         end
-                        ValueLabel.Visible = true
-                        Box:Destroy()
-                        Library:SaveConfigDebounced(
-                            config.ConfigFolder or Library.ConfigSettings.Folder or "LuneConfigs",
-                            config.ConfigName or Library.ConfigSettings.Name or "Default"
-                        )
+    
+                        if config.Flag then
+                            Library.Flags[config.Flag] = value
+                        end
                     end
-                )
+    
+                    ValueLabel.Visible = true
+                    Box:Destroy()
+    
+                    Library:SaveConfigDebounced(
+                        config.ConfigFolder or Library.ConfigSettings.Folder or "LuneConfigs",
+                        config.ConfigName or Library.ConfigSettings.Name or "Default"
+                    )
+                end)
             end
+    
             lastClick = tick()
         end
-
+    
         local InputBtn = Instance.new("TextButton")
         InputBtn.Parent = Frame
         InputBtn.Size = UDim2.new(1, 0, 0, 30)
@@ -1837,127 +1859,161 @@ function Library.AttachComponents(obj, container)
         InputBtn.BackgroundTransparency = 1
         InputBtn.Text = ""
         InputBtn.ZIndex = 1
-
+    
         InputBtn.MouseButton1Click:Connect(CheckDoubleClick)
-
+    
         local Trigger = Instance.new("TextButton")
         Trigger.Parent = SliderBg
         Trigger.Size = UDim2.new(1, 0, 1, 0)
         Trigger.BackgroundTransparency = 1
         Trigger.Text = ""
         Trigger.ZIndex = 3
-
+    
         local function paramsUpdate()
             Tween(Stroke, {0.2}, {Color = Library.Theme.Accent})
         end
-
+    
         local function paramsReset()
             Tween(Stroke, {0.2}, {Color = Library.Theme.Border})
         end
-
+    
         local changedEvent = Library:CreateSignal()
-
+    
         local function Update(input)
-            local percent = math.clamp((input.Position.X - SliderBg.AbsolutePosition.X) / SliderBg.AbsoluteSize.X, 0, 1)
-            value = math.floor(min + (max - min) * percent)
-
-            Tween(Fill, {0.1}, {Size = UDim2.new(percent, 0, 1, 0)})
+            local percent = math.clamp(
+                (input.Position.X - SliderBg.AbsolutePosition.X) / SliderBg.AbsoluteSize.X,
+                0,
+                1
+            )
+    
+            value = SnapValue(min + (max - min) * percent)
+    
+            percent = (value - min) / (max - min)
+    
+            Tween(Fill, {0.1}, {
+                Size = UDim2.new(percent, 0, 1, 0)
+            })
+    
             ValueLabel.Text = tostring(value)
+    
             if config.Callback then
                 config.Callback(value)
             end
+    
             if config.Flag then
                 Library.Flags[config.Flag] = value
             end
+    
             changedEvent:Fire(value)
         end
-
+    
         local dragEndConn
-        Trigger.InputBegan:Connect(
-            function(input)
-                if
-                    input.UserInputType == Enum.UserInputType.MouseButton1 or
-                        input.UserInputType == Enum.UserInputType.Touch
-                 then
-                    CheckDoubleClick()
-                    dragging = true
-                    paramsUpdate()
-                    Update(input)
-
-                    if dragEndConn then dragEndConn:Disconnect() end
-                    dragEndConn = UserInputService.InputEnded:Connect(function(input2)
-                        if input2.UserInputType == Enum.UserInputType.MouseButton1 or input2.UserInputType == Enum.UserInputType.Touch then
-                            dragging = false
-                            paramsReset()
-                            dragEndConn:Disconnect()
-                            dragEndConn = nil
-                            
-                            Library:SaveConfigDebounced(
-                                config.ConfigFolder or Library.ConfigSettings.Folder or "LuneConfigs",
-                                config.ConfigName or Library.ConfigSettings.Name or "Default"
-                            )
-                        end
-                    end)
+    
+        Trigger.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+    
+                CheckDoubleClick()
+    
+                dragging = true
+                paramsUpdate()
+    
+                Update(input)
+    
+                if dragEndConn then
+                    dragEndConn:Disconnect()
                 end
+    
+                dragEndConn = UserInputService.InputEnded:Connect(function(input2)
+                    if input2.UserInputType == Enum.UserInputType.MouseButton1
+                    or input2.UserInputType == Enum.UserInputType.Touch then
+    
+                        dragging = false
+                        paramsReset()
+    
+                        dragEndConn:Disconnect()
+                        dragEndConn = nil
+    
+                        Library:SaveConfigDebounced(
+                            config.ConfigFolder or Library.ConfigSettings.Folder or "LuneConfigs",
+                            config.ConfigName or Library.ConfigSettings.Name or "Default"
+                        )
+                    end
+                end)
             end
-        )
-
-        local sliderInputConn = UserInputService.InputChanged:Connect(
-            function(input)
-                if
-                    dragging and
-                        (input.UserInputType == Enum.UserInputType.MouseMovement or
-                            input.UserInputType == Enum.UserInputType.Touch)
-                 then
-                    Update(input)
-                end
+        end)
+    
+        local sliderInputConn = UserInputService.InputChanged:Connect(function(input)
+            if dragging and (
+                input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch
+            ) then
+                Update(input)
             end
-        )
+        end)
+    
         local function cleanupSlider()
             if sliderInputConn then
                 sliderInputConn:Disconnect()
                 sliderInputConn = nil
             end
+    
             if dragEndConn then
                 dragEndConn:Disconnect()
                 dragEndConn = nil
             end
+    
             dragging = false
         end
+    
         Frame.AncestryChanged:Connect(function()
             if not Frame.Parent then
                 cleanupSlider()
             end
         end)
-
+    
         if config.Flag and Library.Flags[config.Flag] then
-            value = Library.Flags[config.Flag]
+            value = SnapValue(Library.Flags[config.Flag])
+    
             local p = (value - min) / (max - min)
+    
             Fill.Size = UDim2.new(p, 0, 1, 0)
             ValueLabel.Text = tostring(value)
         end
-
-        slider.Frame = Frame
-        slider.GetValue = function()
-            return value
-        end
-
+    
         local sliderObj = {
             Frame = Frame,
             Name = config.Name,
-            GetValue = function() return value end,
+    
+            GetValue = function()
+                return value
+            end,
+    
             SetValue = function(val)
-                value = math.clamp(val, min, max)
+                value = SnapValue(val)
+    
                 local percent = (value - min) / (max - min)
-                Tween(Fill, {0.1}, {Size = UDim2.new(percent, 0, 1, 0)})
+    
+                Tween(Fill, {0.1}, {
+                    Size = UDim2.new(percent, 0, 1, 0)
+                })
+    
                 ValueLabel.Text = tostring(value)
-                if config.Callback then config.Callback(value) end
-                if config.Flag then Library.Flags[config.Flag] = value end
+    
+                if config.Callback then
+                    config.Callback(value)
+                end
+    
+                if config.Flag then
+                    Library.Flags[config.Flag] = value
+                end
+    
                 changedEvent:Fire(value)
             end,
+    
             OnChanged = changedEvent
         }
-
+    
         local elementData = {
             Type = "slider",
             Name = config.Name,
@@ -1965,19 +2021,20 @@ function Library.AttachComponents(obj, container)
             Default = config.Default or min,
             Min = min,
             Max = max,
+            Increment = increment,
             Callback = config.Callback,
             GetValue = sliderObj.GetValue,
             SetValue = sliderObj.SetValue
         }
+    
         Library:RegisterElement(elementData)
-
-        InputBtn.MouseButton2Click:Connect(
-            function()
-                Library:ShowElementContextMenu(elementData)
-            end
-        )
-
+    
+        InputBtn.MouseButton2Click:Connect(function()
+            Library:ShowElementContextMenu(elementData)
+        end)
+    
         table.insert(obj.Elements, sliderObj)
+    
         return sliderObj
     end
 
